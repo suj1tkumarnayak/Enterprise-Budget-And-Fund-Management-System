@@ -1,8 +1,25 @@
 # ARCHITECTURE.md
+
 ## EBFMS — System Architecture Reference
 
 > This is the authoritative architecture document.
 > Any deviation requires a DECISION_REGISTER entry.
+
+> **Relationship to `EBFMS_Architecture_Document.docx`:** The `.docx` is the
+> pre-implementation planning document (Sections 9–11 describe a Spring
+> Boot / Java / Kubernetes / RabbitMQ-based target). **This file
+> (`ARCHITECTURE.md`) is the authoritative, adopted architecture for the
+> actual system being built** — Node.js + Express + TypeScript + Prisma +
+> PostgreSQL, deployed to Vercel (frontend) + Render (backend) + Neon (DB),
+> per `README.md` and `TECH_STACK.md`. Sections 9–11 of the `.docx`
+> (System Architecture, Project Structure, Tech Stack) are **superseded** by
+> this document and by `TECH_STACK.md`. The `.docx` remains authoritative
+> for Sections 1–8 and 12–15 (functional requirements, RBAC, business
+> workflows, database design, API conventions, roadmap, security, NFRs,
+> future enhancements), which this document and the schema implement.
+> Do not "fix" the Node/Express implementation to match the `.docx`'s
+> Spring Boot description — that document is the superseded planning
+> draft, not a target to converge on.
 
 ---
 
@@ -25,10 +42,10 @@ EBFMS is a multi-tier enterprise financial management system. It manages the ful
 └─────────────────────────┬───────────────────────────────┘
                           │ Prisma ORM
 ┌─────────────────────────▼───────────────────────────────┐
-│                   DATA TIER                             │
+│                   DATA TIER                              │
 │   PostgreSQL (primary)                                  │
-│   Append-only ledger tables                             │
-│   Partitioned audit_logs table                          │
+│   Append-only ledger tables                              │
+│   Partitioned audit_logs table                           │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -83,6 +100,7 @@ Each business domain maps to a feature folder under `frontend/src/features/<feat
 ```
 
 **Global structure:**
+
 ```
 frontend/src/
   api/httpClient.ts        ← Axios instance with interceptors
@@ -101,31 +119,41 @@ frontend/src/
 ## 4. AUTHENTICATION ARCHITECTURE
 
 ### 4.1 Token Strategy
+
 - **Access Token**: JWT, short-lived (15 min), stateless
 - **Refresh Token**: Opaque, hashed in DB (`refresh_tokens` table), rotated on each use
 - **Rotation**: Old refresh token is revoked before issuing new one (prevents reuse)
 
 ### 4.2 Middleware Chain
+
 ```
 Request → authenticate.ts → authorize.ts → Controller
 ```
+
 - `authenticate.ts`: Validates JWT, attaches `req.user`
 - `authorize.ts`: Checks `req.user.role` against allowed roles
 
 ### 4.3 Public Routes (no auth required)
+
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 - `POST /api/auth/forgot-password`
 - `GET  /health`
+
+> Security Engineer must verify this exemption list against the actual
+> registered routes once the `auth` module (M2) is implemented and its
+> router is uncommented in `app.ts` — see `PROJECT_RULES.md` Rule 10.
 
 ---
 
 ## 5. APPROVAL ENGINE ARCHITECTURE
 
 ### 5.1 Design
+
 The approval engine is **polymorphic** — it drives both BudgetRequest and Expense approvals using a single set of tables. This is documented in schema.prisma under the `ApprovalInstance` model.
 
 ### 5.2 Tables
+
 ```
 ApprovalChain          ← Configuration: which roles approve, in which order
 ApprovalChainStage     ← Ordered stages within a chain
@@ -134,11 +162,13 @@ ApprovalInstanceStage  ← One row per stage per live process (records decisions
 ```
 
 ### 5.3 Key Design Decision
+
 `ApprovalInstance.entityId` is intentionally **not a database-level foreign key**. It is a polymorphic reference to either a `BudgetRequest` or `Expense` row, determined by `entityType`. Referential integrity is enforced at the application/service layer.
 
 **This decision is immutable.** Do not add DB-level FKs to `ApprovalInstance.entityId`.
 
 ### 5.4 Approval Flow
+
 ```
 Entity Created (Draft)
   → Submit → ApprovalInstance created → Stage 1 starts
@@ -154,6 +184,7 @@ Entity Created (Draft)
 ## 6. DATA MODEL CONVENTIONS
 
 ### 6.1 All Tables
+
 - **PK**: UUID via `gen_random_uuid()` (DB-generated)
 - **Monetary values**: `Decimal @db.Decimal(15, 2)` — never `Float`
 - **Timestamps**: `@db.Timestamptz` (timezone-aware)
@@ -161,17 +192,32 @@ Entity Created (Draft)
 - **Audit columns**: `createdAt`, `updatedAt`, `createdBy`, `updatedBy` on all business tables
 - **FK behavior**: Default `Restrict` (no silent cascades on financial records)
 
+> **Verified 2026-06-30 (System Architect audit):** `FundAllocation` is
+> the one business-entity table that currently has audit columns but no
+> `deletedAt`. This is intentional, not an oversight — allocations are
+> immutable and corrected exclusively via reversing ledger entries
+> (ADR-004), so a soft-delete path would conflict with that guarantee.
+> Database Engineer/Architect: do not add `deletedAt` to `FundAllocation`
+> without a new ADR explaining how it interacts with the reversal-only
+> correction model.
+
 ### 6.2 Append-Only Tables (never UPDATE/DELETE at application layer)
+
 - `allocation_ledger_entries`
 - `audit_logs`
 - `payroll_cost_entries`
 
 ### 6.3 Key Indexes
+
 Defined in schema.prisma. Critical composite indexes:
+
 - `[departmentId, status]` on `budget_requests` (dashboard queries)
 - `[entityType, entityId]` on `approval_instances` (polymorphic lookup)
 - `[fundAllocationId, status]` on `expenses` (balance calculations)
 - `[userId, isRead]` on `notifications` (unread count)
+
+> Verified present in `schema.prisma` as of this audit — all four indexes
+> exist exactly as specified above.
 
 ---
 
@@ -180,6 +226,7 @@ Defined in schema.prisma. Critical composite indexes:
 `backend/src/events/eventBus.ts` — Internal Node.js EventEmitter for decoupled side effects.
 
 Events trigger:
+
 - Notification creation
 - Audit log entries for cross-module actions
 - Analytics snapshot invalidation
@@ -200,6 +247,7 @@ Do not use direct service-to-service imports for cross-cutting concerns. Use the
 ## 9. LOGGING
 
 `backend/src/common/utils/logger.ts` — Winston-based structured logger.
+
 - Log levels: `error`, `warn`, `info`, `debug`
 - All HTTP requests logged via `requestLogger.ts` middleware
 - Sensitive fields (passwords, tokens) must never appear in logs
@@ -209,16 +257,19 @@ Do not use direct service-to-service imports for cross-cutting concerns. Use the
 ## 10. INFRASTRUCTURE
 
 ### 10.1 Docker
+
 - `docker-compose.yml` at root: orchestrates backend, frontend, postgres
 - Each service has its own `Dockerfile`
 - Never hardcode ports — use environment variables
 
 ### 10.2 CI/CD
+
 - `.github/workflows/ci.yml`: lint, type-check, test on every PR
 - Deployments are triggered by merges to `main`
 
 ### 10.3 Database
-- PostgreSQL — primary datastore
+
+- PostgreSQL 16 (per `docker-compose.yml` / `.github/workflows/ci.yml`; satisfies the ADR-001 "PostgreSQL 15+" floor) — primary datastore
 - Prisma ORM — schema management and query interface
 - `audit_logs` table is partitioned by month (defined in migration SQL)
 - Migrations in `backend/prisma/migrations/`
@@ -227,24 +278,34 @@ Do not use direct service-to-service imports for cross-cutting concerns. Use the
 
 ## 11. FILE OWNERSHIP MAP
 
-| Path | Owner Role |
-|------|-----------|
-| `backend/src/modules/*/` | Backend Engineer |
-| `backend/src/common/` | System Architect |
-| `backend/prisma/schema.prisma` | Database Engineer + Architect |
-| `backend/prisma/migrations/` | Database Engineer |
-| `frontend/src/features/*/` | Frontend Engineer |
-| `frontend/src/components/common/` | Frontend Engineer |
-| `frontend/src/api/` | Frontend Engineer |
-| `docker-compose.yml` | DevOps Engineer |
-| `.github/workflows/` | DevOps Engineer |
-| `backend/Dockerfile` | DevOps Engineer |
-| `frontend/Dockerfile` | DevOps Engineer |
-| `ai-team/` | Project Manager |
-| `ai-team/architecture/` | System Architect |
-| `ai-team/docs/` | Documentation Engineer |
+| Path                              | Owner Role                    |
+| --------------------------------- | ----------------------------- |
+| `backend/src/modules/*/`          | Backend Engineer              |
+| `backend/src/common/`             | System Architect              |
+| `backend/prisma/schema.prisma`    | Database Engineer + Architect |
+| `backend/prisma/migrations/`      | Database Engineer             |
+| `backend/prisma/seed.ts`          | Database Engineer             |
+| `frontend/src/features/*/`        | Frontend Engineer             |
+| `frontend/src/components/common/` | Frontend Engineer             |
+| `frontend/src/api/`               | Frontend Engineer             |
+| `docker-compose.yml`              | DevOps Engineer               |
+| `.github/workflows/`              | DevOps Engineer               |
+| `backend/Dockerfile`              | DevOps Engineer               |
+| `frontend/Dockerfile`             | DevOps Engineer               |
+| `frontend/nginx.conf`             | DevOps Engineer               |
+| `ai-team/`                        | Project Manager               |
+| `ai-team/architecture/`           | System Architect              |
+| `ai-team/docs/`                   | Documentation Engineer        |
+
+> **Correction (2026-06-30):** `backend/prisma/seed.ts` and
+> `frontend/nginx.conf` were missing from this table despite being
+> explicitly assigned in `Database Engineer/role.md` and
+> `DevOps Engineer/role.md` respectively. Added above so this table
+> matches the per-role ownership docs. This is a documentation
+> correction, not a structural change — no ADR required (`PROJECT_RULES.md`
+> Rule 5 distinguishes corrections from deprecations).
 
 ---
 
-*This document is owned by the System Architect.*
-*All changes require a DECISION_REGISTER entry.*
+_This document is owned by the System Architect._
+_All changes require a DECISION_REGISTER entry._
