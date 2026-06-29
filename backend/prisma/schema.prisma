@@ -1,5 +1,16 @@
-// Prisma schema — implemented in M1.4
-// All tables from architecture document Section 6.2 will be defined here.
+// =============================================================================
+// EBFMS — Prisma Schema
+// Architecture Document Reference: Section 6.2 (Core Tables), 6.3 (Indexes)
+//
+// Conventions:
+//   - All PKs: UUID via @default(dbgenerated("gen_random_uuid()"))
+//   - All monetary values: Decimal @db.Decimal(15, 2)
+//   - Soft delete: deletedAt DateTime? — NULL = active
+//   - Audit columns: createdAt, updatedAt, createdBy, updatedBy on all
+//     business tables
+//   - FK behaviour: default Restrict (never silently cascade-delete financial
+//     records)
+// =============================================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -8,4 +19,749 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum ProjectStatus {
+  Draft
+  Active
+  OnHold
+  Completed
+  Archived
+}
+
+enum UrgencyLevel {
+  Low
+  Medium
+  High
+}
+
+enum BudgetRequestStatus {
+  Draft
+  PendingStage1
+  PendingStage2
+  PendingStage3
+  Approved
+  Rejected
+  Returned
+  Allocated
+  Withdrawn
+}
+
+enum ApprovalEntityType {
+  BudgetRequest
+  Expense
+}
+
+enum ApprovalInstanceStatus {
+  InProgress
+  Approved
+  Rejected
+  Returned
+  Withdrawn
+}
+
+enum ApprovalDecision {
+  Approved
+  Rejected
+  Returned
+}
+
+enum LedgerEntryType {
+  Allocation
+  Expense
+  Reversal
+}
+
+enum ExpenseStatus {
+  Submitted
+  PendingApproval
+  Approved
+  Rejected
+  Posted
+}
+
+enum NotificationType {
+  BudgetRequestSubmitted
+  BudgetRequestApproved
+  BudgetRequestRejected
+  BudgetRequestReturned
+  BudgetRequestEscalated
+  FundsAllocated
+  ExpenseSubmitted
+  ExpenseApproved
+  ExpenseRejected
+  SlaBreached
+  BudgetNearingCeiling
+  PasswordReset
+  AccountLocked
+  SystemAlert
+}
+
+enum DigestFrequency {
+  Immediate
+  Daily
+  Weekly
+}
+
+enum AuditAction {
+  Create
+  Update
+  Delete
+  Approve
+  Reject
+  Return
+  Withdraw
+  Allocate
+  Post
+  Import
+  Login
+  Logout
+  PasswordChange
+  RoleChange
+}
+
+// =============================================================================
+// AUTHENTICATION & USERS
+// =============================================================================
+
+/// System roles — seeded at deployment, never created at runtime
+model Role {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String  @unique @db.VarChar(50)
+  description String?
+
+  // Relations
+  users               User[]
+  approvalChainStages ApprovalChainStage[]
+
+  @@map("roles")
+}
+
+/// Core user account — one row per human operator
+model User {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String    @unique @db.VarChar(255)
+  passwordHash         String    @db.VarChar(255)
+  fullName             String    @db.VarChar(255)
+  roleId               String    @db.Uuid
+  departmentId         String?   @db.Uuid
+  isActive             Boolean   @default(true)
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime? @db.Timestamptz
+  mustChangePassword   Boolean   @default(false)
+
+  // Audit columns
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @db.Timestamptz
+  createdBy  String?   @db.Uuid
+  updatedBy  String?   @db.Uuid
+  deletedAt  DateTime? @db.Timestamptz
+
+  // Relations
+  role                    Role                      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  department              Department?               @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
+  managedDepartments      Department[]              @relation("DepartmentManager")
+  projectsManaged         Project[]
+  teamLeaderships         Team[]
+  teamMemberships         TeamMember[]
+  budgetRequestsCreated   BudgetRequest[]
+  allocationsCreated      FundAllocation[]
+  expensesSubmitted       Expense[]
+  approvalStagesDecided   ApprovalInstanceStage[]
+  notifications           Notification[]
+  notificationPreference  NotificationPreference?
+  auditLogsPerformed      AuditLog[]
+
+  // Partial index: WHERE deleted_at IS NULL — speeds active-user lookups
+  // Defined via raw SQL in migration (Prisma does not support partial indexes natively)
+  @@index([email])
+  @@index([roleId])
+  @@index([departmentId])
+  @@map("users")
+}
+
+/// Single-use refresh tokens — rotated on every /auth/refresh call
+model RefreshToken {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @db.Uuid
+  tokenHash   String   @db.VarChar(255)
+  expiresAt   DateTime @db.Timestamptz
+  revokedAt   DateTime? @db.Timestamptz
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  userAgent   String?  @db.VarChar(512)
+  ipAddress   String?  @db.VarChar(45)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+/// One-time tokens for password reset flows — expire after TTL
+model PasswordResetToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @db.VarChar(255)
+  expiresAt DateTime @db.Timestamptz
+  usedAt    DateTime? @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+// =============================================================================
+// ORGANIZATIONAL STRUCTURE
+// =============================================================================
+
+/// Organizational units — self-referencing hierarchy for sub-departments
+model Department {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String    @db.VarChar(255)
+  code               String    @unique @db.VarChar(20)
+  parentDepartmentId String?   @db.Uuid
+  managerId          String?   @db.Uuid
+  budgetCeiling      Decimal   @db.Decimal(15, 2)
+  fiscalYear         Int
+
+  // Audit columns
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @db.Timestamptz
+  createdBy  String?   @db.Uuid
+  updatedBy  String?   @db.Uuid
+  deletedAt  DateTime? @db.Timestamptz
+
+  // Relations
+  parentDepartment    Department?                 @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id], onDelete: Restrict)
+  childDepartments    Department[]                @relation("DepartmentHierarchy")
+  manager             User?                       @relation("DepartmentManager", fields: [managerId], references: [id], onDelete: SetNull)
+  users               User[]                      @relation("UserDepartment")
+  budgetRequests      BudgetRequest[]
+  projectFundings     ProjectDepartmentFunding[]
+  teams               Team[]
+  approvalChains      ApprovalChain[]
+  costCenterMappings  CostCenterMapping[]
+
+  @@index([code])
+  @@index([parentDepartmentId])
+  @@index([managerId])
+  @@map("departments")
+}
+
+/// Time-bound or ongoing initiatives consuming departmental budget
+model Project {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String        @db.VarChar(255)
+  description      String?
+  projectManagerId String        @db.Uuid
+  status           ProjectStatus @default(Draft)
+  startDate        DateTime      @db.Date
+  endDate          DateTime?     @db.Date
+
+  // Audit columns
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @db.Timestamptz
+  createdBy  String?   @db.Uuid
+  updatedBy  String?   @db.Uuid
+  deletedAt  DateTime? @db.Timestamptz
+
+  // Relations
+  projectManager      User                       @relation(fields: [projectManagerId], references: [id], onDelete: Restrict)
+  departmentFundings  ProjectDepartmentFunding[]
+  teams               Team[]
+  budgetRequests      BudgetRequest[]
+
+  @@index([projectManagerId])
+  @@index([status])
+  @@map("projects")
+}
+
+/// Many-to-many: projects drawing from multiple departments' budgets
+model ProjectDepartmentFunding {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId    String  @db.Uuid
+  departmentId String  @db.Uuid
+  fundingShare Decimal @db.Decimal(5, 2)
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, departmentId])
+  @@index([departmentId])
+  @@map("project_department_funding")
+}
+
+/// Groups of employees under a project or department
+model Team {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String  @db.VarChar(255)
+  projectId    String? @db.Uuid
+  departmentId String? @db.Uuid
+  teamLeadId   String  @db.Uuid
+
+  // Audit columns
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @db.Timestamptz
+  createdBy  String?   @db.Uuid
+  updatedBy  String?   @db.Uuid
+  deletedAt  DateTime? @db.Timestamptz
+
+  project    Project?    @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  teamLead   User        @relation(fields: [teamLeadId], references: [id], onDelete: Restrict)
+  members    TeamMember[]
+
+  @@index([projectId])
+  @@index([departmentId])
+  @@map("teams")
+}
+
+/// Junction table for team membership
+model TeamMember {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId   String   @db.Uuid
+  userId   String   @db.Uuid
+  joinedAt DateTime @default(now()) @db.Timestamptz
+  leftAt   DateTime? @db.Timestamptz
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+// =============================================================================
+// BUDGET REQUESTS
+// =============================================================================
+
+/// Formal request for funds — immutable once status leaves Draft
+model BudgetRequest {
+  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requesterId  String              @db.Uuid
+  departmentId String              @db.Uuid
+  projectId    String?             @db.Uuid
+  amount       Decimal             @db.Decimal(15, 2)
+  justification String
+  fiscalPeriod String              @db.VarChar(20)
+  status       BudgetRequestStatus @default(Draft)
+  urgency      UrgencyLevel        @default(Medium)
+
+  // Audit columns
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @db.Timestamptz
+  createdBy  String?   @db.Uuid
+  updatedBy  String?   @db.Uuid
+  deletedAt  DateTime? @db.Timestamptz
+
+  // Relations
+  requester         User                        @relation(fields: [requesterId], references: [id], onDelete: Restrict)
+  department        Department                  @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  project           Project?                    @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  attachments       BudgetRequestAttachment[]
+  allocations       FundAllocation[]
+  // NOTE: approval instances for this budget request are looked up via
+  // ApprovalInstance.entityId (polymorphic, no DB-level relation — see
+  // ApprovalInstance model comment).
+
+  // Composite index for dashboard queries (Section 6.3)
+  @@index([departmentId, status])
+  @@index([requesterId])
+  @@index([status])
+  @@map("budget_requests")
+}
+
+/// Supporting documents attached to a budget request
+model BudgetRequestAttachment {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  budgetRequestId String   @db.Uuid
+  fileName        String   @db.VarChar(255)
+  fileUrl         String   @db.VarChar(1024)
+  fileSize        Int
+  mimeType        String   @db.VarChar(100)
+  uploadedBy      String   @db.Uuid
+  uploadedAt      DateTime @default(now()) @db.Timestamptz
+
+  budgetRequest BudgetRequest @relation(fields: [budgetRequestId], references: [id], onDelete: Restrict)
+
+  @@index([budgetRequestId])
+  @@map("budget_request_attachments")
+}
+
+// =============================================================================
+// APPROVAL ENGINE
+// Architecture Doc Section 4.6: Generic, polymorphic — drives both
+// BudgetRequest and Expense approvals via entity_type/entity_id.
+// =============================================================================
+
+/// Data-driven approval chain configuration — one per entity type + department + amount tier
+model ApprovalChain {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  departmentId String?            @db.Uuid
+  entityType   ApprovalEntityType
+  minAmount    Decimal            @db.Decimal(15, 2)
+  maxAmount    Decimal?           @db.Decimal(15, 2)
+  isDefault    Boolean            @default(false)
+
+  // Audit columns
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  createdBy String?  @db.Uuid
+  updatedBy String?  @db.Uuid
+
+  department Department?          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  stages     ApprovalChainStage[]
+  instances  ApprovalInstance[]
+
+  @@index([departmentId, entityType])
+  @@map("approval_chains")
+}
+
+/// Ordered stages within an approval chain
+model ApprovalChainStage {
+  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  approvalChainId  String @db.Uuid
+  stageOrder       Int
+  approverRoleId   String @db.Uuid
+  slaHours         Int    @default(48)
+
+  approvalChain    ApprovalChain          @relation(fields: [approvalChainId], references: [id], onDelete: Cascade)
+  approverRole     Role                   @relation(fields: [approverRoleId], references: [id], onDelete: Restrict)
+  instanceStages   ApprovalInstanceStage[]
+
+  @@unique([approvalChainId, stageOrder])
+  @@map("approval_chain_stages")
+}
+
+/// A live approval process for one specific entity instance
+model ApprovalInstance {
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType      ApprovalEntityType
+  entityId        String                 @db.Uuid
+  approvalChainId String                 @db.Uuid
+  currentStage    Int                    @default(1)
+  status          ApprovalInstanceStatus @default(InProgress)
+  startedAt       DateTime               @default(now()) @db.Timestamptz
+  completedAt     DateTime?              @db.Timestamptz
+
+  approvalChain ApprovalChain          @relation(fields: [approvalChainId], references: [id], onDelete: Restrict)
+  stages        ApprovalInstanceStage[]
+  // NOTE: entityId is a polymorphic reference (BudgetRequest OR Expense per
+  // entityType) and intentionally has NO @relation/FK constraint — a real FK
+  // can only target one table. Referential integrity for entityId is
+  // enforced at the application/service layer. See Architecture Doc 4.6.
+
+  // Composite index for polymorphic lookup (Section 6.3)
+  @@index([entityType, entityId])
+  @@index([status])
+  @@map("approval_instances")
+}
+
+/// One row per stage per live approval — records the decision
+model ApprovalInstanceStage {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  approvalInstanceId String           @db.Uuid
+  chainStageId       String           @db.Uuid
+  stageOrder         Int
+  approverId         String?          @db.Uuid
+  decision           ApprovalDecision?
+  comments           String?
+  decidedAt          DateTime?        @db.Timestamptz
+  slaDeadline        DateTime?        @db.Timestamptz
+  escalatedAt        DateTime?        @db.Timestamptz
+  createdAt          DateTime         @default(now()) @db.Timestamptz
+
+  approvalInstance ApprovalInstance   @relation(fields: [approvalInstanceId], references: [id], onDelete: Cascade)
+  chainStage       ApprovalChainStage @relation(fields: [chainStageId], references: [id], onDelete: Restrict)
+  approver         User?              @relation(fields: [approverId], references: [id], onDelete: SetNull)
+
+  @@index([approvalInstanceId])
+  @@index([approverId])
+  @@map("approval_instance_stages")
+}
+
+// =============================================================================
+// FUND ALLOCATION & LEDGER
+// =============================================================================
+
+/// Earmarks approved funds — immutable; corrections via reversing entries
+model FundAllocation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  budgetRequestId String   @db.Uuid
+  amount          Decimal  @db.Decimal(15, 2)
+  allocatedBy     String   @db.Uuid
+  fiscalPeriod    String   @db.VarChar(20)
+  notes           String?
+
+  // Audit columns
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  createdBy String?  @db.Uuid
+  updatedBy String?  @db.Uuid
+
+  budgetRequest  BudgetRequest           @relation(fields: [budgetRequestId], references: [id], onDelete: Restrict)
+  allocator      User                    @relation(fields: [allocatedBy], references: [id], onDelete: Restrict)
+  ledgerEntries  AllocationLedgerEntry[]
+  expenses       Expense[]
+  payrollEntries PayrollCostEntry[]
+
+  @@index([budgetRequestId])
+  @@map("fund_allocations")
+}
+
+/// Append-only double-entry style ledger for an allocation
+model AllocationLedgerEntry {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fundAllocationId    String          @db.Uuid
+  entryType           LedgerEntryType
+  amount              Decimal         @db.Decimal(15, 2)
+  referenceEntityType String?         @db.VarChar(30)
+  referenceEntityId   String?         @db.Uuid
+  notes               String?
+  createdAt           DateTime        @default(now()) @db.Timestamptz
+  createdBy           String?         @db.Uuid
+
+  fundAllocation FundAllocation @relation(fields: [fundAllocationId], references: [id], onDelete: Restrict)
+
+  @@index([fundAllocationId])
+  @@map("allocation_ledger_entries")
+}
+
+// =============================================================================
+// EXPENSE MANAGEMENT
+// =============================================================================
+
+/// Configurable expense categories (Travel, Equipment, Software, etc.)
+model ExpenseCategory {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String    @unique @db.VarChar(100)
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @db.Timestamptz
+
+  expenses Expense[]
+
+  @@map("expense_categories")
+}
+
+/// Actual spend recorded against a fund allocation
+model Expense {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fundAllocationId String        @db.Uuid
+  submittedBy      String        @db.Uuid
+  categoryId       String?       @db.Uuid
+  amount           Decimal       @db.Decimal(15, 2)
+  vendorName       String?       @db.VarChar(255)
+  dateIncurred     DateTime      @db.Date
+  status           ExpenseStatus @default(Submitted)
+  description      String?
+
+  // Audit columns
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  updatedAt DateTime  @updatedAt @db.Timestamptz
+  createdBy String?   @db.Uuid
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime? @db.Timestamptz
+
+  fundAllocation    FundAllocation      @relation(fields: [fundAllocationId], references: [id], onDelete: Restrict)
+  submitter         User                @relation(fields: [submittedBy], references: [id], onDelete: Restrict)
+  category          ExpenseCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  attachments       ExpenseAttachment[]
+  // NOTE: approval instances for this expense are looked up via
+  // ApprovalInstance.entityId (polymorphic, no DB-level relation — see
+  // ApprovalInstance model comment).
+
+  // Composite index for balance calculations (Section 6.3)
+  @@index([fundAllocationId, status])
+  @@index([submittedBy])
+  @@map("expenses")
+}
+
+/// Receipt/invoice files attached to an expense
+model ExpenseAttachment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expenseId  String   @db.Uuid
+  fileName   String   @db.VarChar(255)
+  fileUrl    String   @db.VarChar(1024)
+  fileSize   Int
+  mimeType   String   @db.VarChar(100)
+  uploadedBy String   @db.Uuid
+  uploadedAt DateTime @default(now()) @db.Timestamptz
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+
+  @@index([expenseId])
+  @@map("expense_attachments")
+}
+
+// =============================================================================
+// PAYROLL INTEGRATION
+// =============================================================================
+
+/// Cost-center to department/project routing for payroll import
+model CostCenterMapping {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  costCenterCode String  @unique @db.VarChar(50)
+  departmentId  String   @db.Uuid
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now()) @db.Timestamptz
+  updatedAt     DateTime @updatedAt @db.Timestamptz
+  createdBy     String?  @db.Uuid
+
+  department       Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  payrollEntries   PayrollCostEntry[]
+
+  @@index([departmentId])
+  @@map("cost_center_mapping")
+}
+
+/// Read-only payroll-derived cost entries — imported from HR system
+model PayrollCostEntry {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fundAllocationId  String   @db.Uuid
+  costCenterMappingId String @db.Uuid
+  payrollRunId      String   @db.VarChar(100)
+  periodStart       DateTime @db.Date
+  periodEnd         DateTime @db.Date
+  grossAmount       Decimal  @db.Decimal(15, 2)
+  employeeCount     Int
+  notes             String?
+  importedAt        DateTime @default(now()) @db.Timestamptz
+  importedBy        String   @db.Uuid
+
+  fundAllocation    FundAllocation    @relation(fields: [fundAllocationId], references: [id], onDelete: Restrict)
+  costCenterMapping CostCenterMapping @relation(fields: [costCenterMappingId], references: [id], onDelete: Restrict)
+
+  @@index([fundAllocationId])
+  @@index([payrollRunId])
+  @@map("payroll_cost_entries")
+}
+
+// =============================================================================
+// NOTIFICATIONS
+// =============================================================================
+
+/// In-app (and trigger-for-email) notification per user
+model Notification {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  payload   Json
+  isRead    Boolean          @default(false)
+  readAt    DateTime?        @db.Timestamptz
+  createdAt DateTime         @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Composite index for unread-count queries (Section 6.3)
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+/// Per-user notification delivery preferences
+model NotificationPreference {
+  userId          String          @id @db.Uuid
+  emailEnabled    Boolean         @default(true)
+  digestFrequency DigestFrequency @default(Immediate)
+  updatedAt       DateTime        @updatedAt @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+// =============================================================================
+// AUDIT LOGS
+// Architecture Doc Section 4.13:
+//   - Append-only — no UPDATE or DELETE at the application layer
+//   - Partitioned by month for scale (defined in migration SQL, not Prisma)
+//   - Captures before/after state for UPDATE actions
+// =============================================================================
+
+model AuditLog {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId     String?     @db.Uuid
+  action      AuditAction
+  entityType  String      @db.VarChar(50)
+  entityId    String      @db.Uuid
+  beforeState Json?
+  afterState  Json?
+  ipAddress   String?     @db.VarChar(45)
+  userAgent   String?     @db.VarChar(512)
+  createdAt   DateTime    @default(now()) @db.Timestamptz
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  // Indexes from Section 6.3
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// SETTINGS
+// =============================================================================
+
+/// Key-value system configuration — versioned for audit
+model SystemSetting {
+  key       String   @id @db.VarChar(100)
+  value     Json
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  updatedBy String?  @db.Uuid
+
+  @@map("system_settings")
+}
+
+/// Approval threshold tiers — drives which chain fires for a given amount
+model ApprovalThresholdConfig {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType   ApprovalEntityType
+  departmentId String?            @db.Uuid
+  tierName     String             @db.VarChar(50)
+  minAmount    Decimal            @db.Decimal(15, 2)
+  maxAmount    Decimal?           @db.Decimal(15, 2)
+  createdAt    DateTime           @default(now()) @db.Timestamptz
+  updatedAt    DateTime           @updatedAt @db.Timestamptz
+  updatedBy    String?            @db.Uuid
+
+  @@index([entityType, departmentId])
+  @@map("approval_threshold_config")
+}
+
+// =============================================================================
+// ANALYTICS (pre-aggregated, never used for transactional writes)
+// =============================================================================
+
+/// Scheduled snapshot of department-level spend — refreshed by cron job
+model AnalyticsSnapshot {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshotDate     DateTime @db.Date
+  departmentId     String   @db.Uuid
+  totalAllocated   Decimal  @db.Decimal(15, 2)
+  totalSpent       Decimal  @db.Decimal(15, 2)
+  totalRemaining   Decimal  @db.Decimal(15, 2)
+  pendingRequests  Int
+  approvedRequests Int
+  createdAt        DateTime @default(now()) @db.Timestamptz
+
+  @@unique([snapshotDate, departmentId])
+  @@index([snapshotDate])
+  @@index([departmentId])
+  @@map("analytics_snapshots")
 }
