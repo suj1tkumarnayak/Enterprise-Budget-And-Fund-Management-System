@@ -5,7 +5,47 @@
 
 ---
 
-## 2026-06-30 — Session 2: State Audit, jest.config.ts Re-Fix
+## 2026-06-30 — Session 2 (continued): TASK-015 — auth.service.test.ts
+
+Wrote `backend/tests/unit/auth.service.test.ts` (20 cases) to close the
+remaining gap in Backend Engineer's M2 scope:
+
+- **login**: success (tokens + reset failedLoginAttempts + Login audit
+  event), unknown email (no enumeration), deactivated account, locked
+  account (lockout not yet expired), wrong password (increments
+  failedLoginAttempts without locking), 5th failed attempt (locks account +
+  audit event).
+- **refresh**: successful rotation (old token revoked, new issued),
+  unknown/expired token, revoked-token reuse (entire family revoked + audit
+  event), inactive/missing user.
+- **logout**: revokes an active token + emits Logout; idempotent for
+  unknown/already-revoked tokens (no error).
+- **forgotPassword**: no-op for unknown email (no enumeration, no token
+  created); creates a token for a real user.
+- **resetPassword**: invalid/expired/used token throws `ValidationError`;
+  success hashes with the documented Argon2id params, runs the
+  `$transaction`, and emits `PasswordChange`.
+
+Mocked `@config/index` (avoids real env-validation `process.exit` calls in
+test), `argon2`, `jsonwebtoken`, `@events/eventBus`, and `@prisma/client`.
+Did not write `tests/integration/auth.test.ts` (TASK-016) — that directory
+is QA Engineer's full ownership per their role.md; flagged it in
+`pending.md` instead of writing it myself, per Rule C-02.
+
+This closes out everything in Backend Engineer's scope for M2. The module
+cannot be marked ✅ Complete in `README.md` until QA's integration tests
+(TASK-016) and Security Engineer's sign-off (TASK-017) land — both outside
+this role's ownership, logged accordingly.
+
+### Next Session Starting Point
+
+1. Do not start M3 (`users` module) until TASK-016/TASK-017 are confirmed
+   done — check Security Engineer's and QA Engineer's `handoff.md`/`pending.md`
+   first.
+2. If both are confirmed, M3 can begin: `backend/src/modules/users/` —
+   schema → dto → service → controller → routes, in that order.
+
+---
 
 **Session type:** Intake/audit — reconciled stale role-management files against actual code.
 **Branch:** `backend-engineer/AUDIT-002-BE/fix-jest-coverage-threshold-for-real`

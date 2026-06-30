@@ -18,33 +18,34 @@
 
 ## Milestone Progress
 
-| Milestone           | Status                                | Notes                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M1 — Foundation     | ✅ 100%                               | Unchanged from Session 1.                                                                                                                                                                                                                                                                                                                                                                                               |
-| M2 — Authentication | 🔄 Implementation done, tests pending | `auth.schema.ts`/`auth.dto.ts`/`auth.service.ts`/`auth.controller.ts`/`auth.routes.ts` + `eventBus.ts` are real, working code — verified by direct read this session, not assumed. `app.ts` registers `authRoutes`. **No unit test file exists for `auth.service.ts`** — TASK-015 is the real remaining blocker before M2 is Done per `DEFINITION_OF_DONE.md` (coverage ≥80% required, gate is now genuinely enforced). |
-| M3 — Users          | ⏳ 0%                                 | All 5 files still `export {}` stubs. Correctly blocked behind M2 sign-off.                                                                                                                                                                                                                                                                                                                                              |
+| Milestone           | Status                                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1 — Foundation     | ✅ 100%                                                       | Unchanged from Session 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| M2 — Authentication | 🔄 Backend scope complete; QA + Security sign-off outstanding | `auth.*` files + `eventBus.ts` implemented and verified; `auth.service.test.ts` written this session (20 cases: login success/lockout/wrong-password/locked-account/inactive-account, refresh rotation/expired/reuse-detection/inactive-user, logout active/idempotent, forgotPassword no-enumeration/creates-token, resetPassword invalid-token/success). Remaining: TASK-016 (QA integration tests) and TASK-017 (Security review) are outside Backend Engineer ownership. |
+| M3 — Users          | ⏳ 0%                                                         | All 5 files still `export {}` stubs. Correctly blocked behind M2 sign-off.                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ---
 
 ## Task Completion Log
 
-| Task ID      | Description                                                           | Status  | Notes                                           |
-| ------------ | --------------------------------------------------------------------- | ------- | ----------------------------------------------- |
-| TASK-019     | `eventBus.ts`                                                         | ✅ Done | Verified implemented this session               |
-| TASK-010     | Auth module (schema/dto/service/controller/routes)                    | ✅ Done | Verified implemented this session               |
-| TASK-014     | Refresh rotation + reuse detection                                    | ✅ Done | Part of `auth.service.ts`                       |
-| TASK-011-REG | Router registered in `app.ts`                                         | ✅ Done | Verified                                        |
-| AUDIT-002-BE | Fix `jest.config.ts` coverage key (Session 1's fix was never applied) | ✅ Done | `/mnt/user-data/outputs/backend/jest.config.ts` |
-| TASK-015     | `auth.service.test.ts`                                                | ⏳ Next | No file exists yet                              |
+| Task ID      | Description                                                           | Status  | Notes                                                                                                               |
+| ------------ | --------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| TASK-019     | `eventBus.ts`                                                         | ✅ Done | Verified implemented this session                                                                                   |
+| TASK-010     | Auth module (schema/dto/service/controller/routes)                    | ✅ Done | Verified implemented this session                                                                                   |
+| TASK-014     | Refresh rotation + reuse detection                                    | ✅ Done | Part of `auth.service.ts`                                                                                           |
+| TASK-011-REG | Router registered in `app.ts`                                         | ✅ Done | Verified                                                                                                            |
+| AUDIT-002-BE | Fix `jest.config.ts` coverage key (Session 1's fix was never applied) | ✅ Done | `/mnt/user-data/outputs/backend/jest.config.ts`                                                                     |
+| TASK-015     | `auth.service.test.ts`                                                | ✅ Done | 20 test cases across login/refresh/logout/forgotPassword/resetPassword; mocks prisma, argon2, jwt, eventBus, config |
 
 ---
 
 ## Blockers Log
 
-| Date       | Blocker                                                                       | Status      | Resolution                  |
-| ---------- | ----------------------------------------------------------------------------- | ----------- | --------------------------- |
-| 2026-06-30 | `jest.config.ts` `coverageThresholds` typo — Session 1 claimed fixed, was not | ✅ Resolved | Fixed for real this session |
-| 2026-06-30 | `auth.service.ts` has no unit tests; coverage gate now genuinely live         | 🔄 Open     | TASK-015, next session      |
+| Date       | Blocker                                                                          | Status                                      | Resolution                                           |
+| ---------- | -------------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
+| 2026-06-30 | `jest.config.ts` `coverageThresholds` typo — Session 1 claimed fixed, was not    | ✅ Resolved                                 | Fixed for real this session                          |
+| 2026-06-30 | `auth.service.ts` has no unit tests; coverage gate now genuinely live            | ✅ Resolved                                 | TASK-015 written this session                        |
+| 2026-06-30 | M2 cannot be marked ✅ Complete without QA integration tests + Security sign-off | 🔄 Open (not Backend Engineer's to resolve) | TASK-016 → QA Engineer; TASK-017 → Security Engineer |
 
 ---
 
