@@ -1,128 +1,58 @@
 # progress.md — Backend Engineer Progress Tracker
 
 > Owner: Backend Engineer
-> Updated: 2026-06-30 — First real entry; prior session(s) left no handoff trail
-> Rule: Update at the end of every work session.
+> Updated: 2026-06-30 — Session 2 (corrected against verified actual code state)
 
 ---
 
 ## Overall Status
 
-| Field             | Value                                                       |
-| ----------------- | ----------------------------------------------------------- |
-| Current Milestone | M2 — Authentication (not started; ready to begin)           |
-| Role Completion % | ~6% (M1 100% complete; M2–M18 at 0%)                        |
-| Last Updated      | 2026-06-30 UTC                                              |
-| Active Branch     | `backend-engineer/AUDIT-001-BE/fix-jest-coverage-threshold` |
+| Field             | Value                                                                   |
+| ----------------- | ----------------------------------------------------------------------- |
+| Current Milestone | M2 — Authentication (implementation done; tests + sign-off outstanding) |
+| Role Completion % | M1: 100%, M2 implementation: 100% / M2 tests: 0%                        |
+| Last Updated      | 2026-06-30 UTC                                                          |
+| Active Branch     | `backend-engineer/AUDIT-002-BE/fix-jest-coverage-threshold-for-real`    |
 
 ---
 
 ## Milestone Progress
 
-| Milestone                     | BE-Assigned Tasks | Completed | % Done   | Notes                                                                                              |
-| ----------------------------- | ----------------- | --------- | -------- | -------------------------------------------------------------------------------------------------- |
-| M1 — Foundation               | 3                 | 3         | **100%** | app.ts, server.ts, config, common middleware, asyncHandler, AppError, decimal.ts                   |
-| M2 — Authentication           | 5                 | 0         | 0%       | eventBus prerequisite (TASK-019) must land first; schema/DTO/service/controller/routes all stubbed |
-| M3 — User & Role Management   | 2                 | 0         | 0%       | Depends on M2                                                                                      |
-| M4 — Departments              | 1                 | 0         | 0%       | Depends on M3                                                                                      |
-| M5 — Projects & Teams         | 2                 | 0         | 0%       | Depends on M4                                                                                      |
-| M6 — Budget Requests          | 1                 | 0         | 0%       | Depends on M5                                                                                      |
-| M7 — Approval Engine          | 3                 | 0         | 0%       | Highest complexity (3–4 week estimate); polymorphic engine; eventBus-dependent                     |
-| M8 — Fund Allocation          | 2                 | 0         | 0%       | Depends on M7                                                                                      |
-| M9 — Expense Management       | 2                 | 0         | 0%       | Depends on M8                                                                                      |
-| M10 — Notifications           | 2                 | 0         | 0%       | Depends on M7 + eventBus                                                                           |
-| M11 — Audit Logging           | 2                 | 0         | 0%       | Built incrementally per module per Architecture doc recommendation                                 |
-| M12 — Payroll                 | 2                 | 0         | 0%       | Depends on M8                                                                                      |
-| M13 — Reports                 | 2                 | 0         | 0%       | Depends on M9                                                                                      |
-| M14 — Analytics               | 2                 | 0         | 0%       | Must read analytics_snapshots ONLY, never live OLTP tables                                         |
-| M15 — Search                  | 1                 | 0         | 0%       | Depends on M9                                                                                      |
-| M16 — Settings & Admin Config | 1                 | 0         | 0%       | Depends on M7                                                                                      |
-| M17 — Security Hardening      | 0                 | 0         | 0%       | All functional milestones complete first; Security Engineer leads                                  |
-| M18 — UAT & Deployment        | 0                 | 0         | 0%       | Last milestone                                                                                     |
+| Milestone           | Status                                | Notes                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1 — Foundation     | ✅ 100%                               | Unchanged from Session 1.                                                                                                                                                                                                                                                                                                                                                                                               |
+| M2 — Authentication | 🔄 Implementation done, tests pending | `auth.schema.ts`/`auth.dto.ts`/`auth.service.ts`/`auth.controller.ts`/`auth.routes.ts` + `eventBus.ts` are real, working code — verified by direct read this session, not assumed. `app.ts` registers `authRoutes`. **No unit test file exists for `auth.service.ts`** — TASK-015 is the real remaining blocker before M2 is Done per `DEFINITION_OF_DONE.md` (coverage ≥80% required, gate is now genuinely enforced). |
+| M3 — Users          | ⏳ 0%                                 | All 5 files still `export {}` stubs. Correctly blocked behind M2 sign-off.                                                                                                                                                                                                                                                                                                                                              |
 
 ---
 
 ## Task Completion Log
 
-| Task ID           | Description                                                                                                       | Status     | Completed Date   | PR / Commit          |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------- | ---------- | ---------------- | -------------------- |
-| **M1 — COMPLETE** |                                                                                                                   |            |                  |                      |
-| TASK-006          | Backend scaffold: app.ts, server.ts, config, common middleware, asyncHandler, AppError, decimal.ts, logger, types | ✅ Done    | M1 (pre-session) | —                    |
-| TASK-012          | `authenticate.ts` JWT validation middleware                                                                       | ✅ Done    | M1 (pre-session) | —                    |
-| TASK-013          | `authorize.ts` RBAC middleware factory                                                                            | ✅ Done    | M1 (pre-session) | —                    |
-| AUDIT-001-BE      | Fix `jest.config.ts`: `coverageThresholds` → `coverageThreshold`                                                  | ✅ Done    | 2026-06-30       | Output file          |
-| INTAKE-001-BE     | Full repo intake + role management files created                                                                  | ✅ Done    | 2026-06-30       | This file + 3 others |
-| **M2 — IN QUEUE** |                                                                                                                   |            |                  |                      |
-| TASK-019          | Implement `eventBus.ts` typed EventEmitter                                                                        | ⏳ Pending | —                | Next P1              |
-| TASK-010          | Auth module: schema → dto → service → controller → routes                                                         | ⏳ Pending | —                | After TASK-019       |
-| TASK-014          | Refresh token rotation + reuse detection (part of auth service)                                                   | ⏳ Pending | —                | Part of TASK-010     |
-| TASK-015          | Auth unit tests (service coverage ≥ 80%)                                                                          | ⏳ Pending | —                | Alongside TASK-010   |
-| TASK-011-REG      | Register auth router in app.ts                                                                                    | ⏳ Pending | —                | After TASK-010       |
-| **M3 — IN QUEUE** |                                                                                                                   |            |                  |                      |
-| TASK-020          | Users module: CRUD, role assignment, department association                                                       | ⏳ Pending | —                | After M2             |
+| Task ID      | Description                                                           | Status  | Notes                                           |
+| ------------ | --------------------------------------------------------------------- | ------- | ----------------------------------------------- |
+| TASK-019     | `eventBus.ts`                                                         | ✅ Done | Verified implemented this session               |
+| TASK-010     | Auth module (schema/dto/service/controller/routes)                    | ✅ Done | Verified implemented this session               |
+| TASK-014     | Refresh rotation + reuse detection                                    | ✅ Done | Part of `auth.service.ts`                       |
+| TASK-011-REG | Router registered in `app.ts`                                         | ✅ Done | Verified                                        |
+| AUDIT-002-BE | Fix `jest.config.ts` coverage key (Session 1's fix was never applied) | ✅ Done | `/mnt/user-data/outputs/backend/jest.config.ts` |
+| TASK-015     | `auth.service.test.ts`                                                | ⏳ Next | No file exists yet                              |
 
 ---
 
 ## Blockers Log
 
-| Date       | Blocker                                                                       | Status      | Resolution                        |
-| ---------- | ----------------------------------------------------------------------------- | ----------- | --------------------------------- |
-| 2026-06-30 | `jest.config.ts` `coverageThresholds` typo — 80% gate never enforced since M1 | ✅ Resolved | Fixed this session (AUDIT-001-BE) |
-| 2026-06-30 | `eventBus.ts` is an `export {}` stub — auth module cannot emit audit events   | 🔄 Open     | TASK-019 (next session, P1)       |
-
----
-
-## Module Implementation State
-
-All 15 backend modules are stubs. Each module folder contains 5 files that all contain only `export {}` or an empty Router:
-
-| Module          | schema | dto  | service | controller | routes      |
-| --------------- | ------ | ---- | ------- | ---------- | ----------- |
-| auth            | stub   | stub | stub    | stub       | Router stub |
-| users           | stub   | stub | stub    | stub       | Router stub |
-| departments     | stub   | stub | stub    | stub       | Router stub |
-| projects        | stub   | stub | stub    | stub       | Router stub |
-| teams           | stub   | stub | stub    | stub       | Router stub |
-| budget-requests | stub   | stub | stub    | stub       | Router stub |
-| approvals       | stub   | stub | stub    | stub       | Router stub |
-| allocations     | stub   | stub | stub    | stub       | Router stub |
-| expenses        | stub   | stub | stub    | stub       | Router stub |
-| payroll         | stub   | stub | stub    | stub       | Router stub |
-| notifications   | stub   | stub | stub    | stub       | Router stub |
-| reports         | stub   | stub | stub    | stub       | Router stub |
-| analytics       | stub   | stub | stub    | stub       | Router stub |
-| audit           | stub   | stub | stub    | stub       | Router stub |
-| settings        | stub   | stub | stub    | stub       | Router stub |
-
-All route registrations in `app.ts` are commented out (`app.use('/api/v1/...')`). Import lines are also missing; they must be added when each module is implemented.
-
----
-
-## Infrastructure State (M1 — all complete)
-
-| Component            | File                                            | Status                | Notes                                                                                                             |
-| -------------------- | ----------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Express app factory  | `backend/src/app.ts`                            | ✅ Production-ready   | Helmet, CORS, JSON parsing, health endpoint, notFoundHandler, errorHandler wired                                  |
-| Server bootstrap     | `backend/src/server.ts`                         | ✅ Production-ready   | Prisma connect, graceful SIGTERM/SIGINT shutdown                                                                  |
-| Environment config   | `backend/src/config/index.ts`                   | ✅ Production-ready   | Zod schema, all 17 env vars validated, typed `config` object                                                      |
-| JWT middleware       | `backend/src/common/middleware/authenticate.ts` | ✅ Production-ready   | Bearer token extraction, `isJwtPayload` type guard, attaches `req.user`                                           |
-| RBAC middleware      | `backend/src/common/middleware/authorize.ts`    | ✅ Production-ready   | Factory `authorize(...RoleName[])`                                                                                |
-| Error hierarchy      | `backend/src/common/errors/AppError.ts`         | ✅ Production-ready   | 8 typed subclasses: Validation, Unauthenticated, Forbidden, NotFound, Conflict, BusinessRule, RateLimit, Internal |
-| Global error handler | `backend/src/common/middleware/errorHandler.ts` | ✅ Production-ready   | Handles ZodError, AppError, unknown — no stack traces to clients                                                  |
-| Monetary utilities   | `backend/src/common/utils/decimal.ts`           | ✅ Production-ready   | addMoney, subtractMoney, multiplyMoney, isPositive, isGreaterThan, formatMoney, assertDoesNotExceed               |
-| Logger               | `backend/src/common/utils/logger.ts`            | ✅ Production-ready   | Winston; JSON in prod, colourized in dev, silent in test                                                          |
-| Async handler        | `backend/src/common/utils/asyncHandler.ts`      | ✅ Production-ready   | Wraps async handlers, forwards rejections to next(err)                                                            |
-| Common types         | `backend/src/common/types/index.ts`             | ✅ Production-ready   | RoleName, JwtPayload, AuthenticatedUser, AuthenticatedRequest, PaginatedResponse, ApiErrorResponse                |
-| Prisma client        | `backend/src/prisma/client.ts`                  | ✅ Production-ready   | Singleton, globalThis pattern for HMR, slow-query logging (>200ms) in dev                                         |
-| Event bus            | `backend/src/events/eventBus.ts`                | ❌ Stub (`export {}`) | MUST implement before M2 service layer                                                                            |
-| Test client          | `backend/tests/helpers/testClient.ts`           | ✅ Production-ready   | Supertest wrapping createApp(), no real port binding                                                              |
+| Date       | Blocker                                                                       | Status      | Resolution                  |
+| ---------- | ----------------------------------------------------------------------------- | ----------- | --------------------------- |
+| 2026-06-30 | `jest.config.ts` `coverageThresholds` typo — Session 1 claimed fixed, was not | ✅ Resolved | Fixed for real this session |
+| 2026-06-30 | `auth.service.ts` has no unit tests; coverage gate now genuinely live         | 🔄 Open     | TASK-015, next session      |
 
 ---
 
 ## Notes
 
-**On TASK-012/013 vs BACKLOG.md:** `BACKLOG.md` lists TASK-012 (authenticate.ts) and TASK-013 (authorize.ts) as M2 pending tasks. Both are ALREADY IMPLEMENTED in M1 — `backend/src/common/middleware/authenticate.ts` and `authorize.ts` are complete, tested (implicitly via integration tests), and architecture-compliant. Do not re-implement.
-
-**On coverage enforcement:** Prior to this session's fix, no Jest run has ever enforced the 80% coverage gate despite all process docs claiming it was enforced. First real coverage enforcement starts with the next `npm run test:coverage` run after the jest.config.ts fix is applied.
-
-**On eventBus.ts:** The ADR-007 decision exists and the design is documented. The implementation is a stub. The auth module's service will need it immediately for audit log emission on Login/Logout/PasswordChange. A minimal implementation suffices for M2 — expand event types as later modules need them.
+Session 1's handoff/progress/daily_log described a state that did not match
+the actual files (claimed jest.config.ts fixed when it wasn't; claimed auth
+module not started when it was fully implemented). This session corrected
+the record by reading the actual files rather than trusting the prior
+session's narrative. Going forward, treat handoff claims as a starting
+hypothesis to verify against the real files, not as ground truth.

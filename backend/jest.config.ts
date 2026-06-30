@@ -29,7 +29,7 @@ const config: Config = {
     '!src/prisma/client.ts',
     '!src/server.ts',
   ],
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       branches: 80,
       functions: 80,
