@@ -23,7 +23,7 @@ export function useApiError(): { getErrorMessage: (error: unknown) => string } {
     // Axios error with a response body
     if (isAxiosError(error)) {
       if (error.response !== undefined) {
-        const data = error.response.data as unknown;
+        const data = error.response.data;
         if (isApiError(data)) {
           return data.error.message;
         }
@@ -53,7 +53,7 @@ function isAxiosError(error: unknown): error is AxiosError {
     typeof error === 'object' &&
     error !== null &&
     'isAxiosError' in error &&
-    (error as Record<string, unknown>)['isAxiosError'] === true
+    error.isAxiosError === true
   );
 }
 
@@ -62,6 +62,6 @@ function isApiError(data: unknown): data is ApiError {
     typeof data === 'object' &&
     data !== null &&
     'error' in data &&
-    typeof (data as Record<string, unknown>)['error'] === 'object'
+    typeof (data as Record<string, unknown>).error === 'object'
   );
 }

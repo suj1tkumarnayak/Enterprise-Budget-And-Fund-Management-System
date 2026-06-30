@@ -46,12 +46,12 @@ export const useAuthStore = create<AuthState>()(
         isAuthLoading: false,
         mustChangePassword: false,
 
-        setAuth: (user, accessToken, mustChangePassword) => {
+        setAuth: (user, accessToken, mustChangePassword): void => {
           localStorage.setItem('accessToken', accessToken);
           set({ user, accessToken, mustChangePassword }, false, 'auth/setAuth');
         },
 
-        clearAuth: () => {
+        clearAuth: (): void => {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           set(
@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthState>()(
           );
         },
 
-        setAuthLoading: (loading) => {
+        setAuthLoading: (loading): void => {
           set({ isAuthLoading: loading }, false, 'auth/setAuthLoading');
         },
       }),

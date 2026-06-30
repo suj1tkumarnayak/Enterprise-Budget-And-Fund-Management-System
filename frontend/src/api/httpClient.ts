@@ -13,7 +13,7 @@ import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axio
  * Refresh token rotation is implemented in M2 (Authentication milestone).
  */
 
-const BASE_URL = import.meta.env['VITE_API_URL'] as string | undefined ?? 'http://localhost:3000';
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000';
 
 export const httpClient: AxiosInstance = axios.create({
   baseURL: `${BASE_URL}/api/v1`,
@@ -30,7 +30,7 @@ httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('accessToken');
 
   if (typeof token === 'string' && token.length > 0) {
-    config.headers['Authorization'] = `Bearer ${token}`;
+    config.headers.Authorization = `Bearer ${token}`;
   }
 
   return config;

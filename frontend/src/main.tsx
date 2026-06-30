@@ -1,7 +1,6 @@
-import { StrictMode } from 'react';
-
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import App from './App';
@@ -11,7 +10,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: (failureCount, error) => {
+      retry: (failureCount, error): boolean => {
         // Do not retry on 4xx errors — they are client errors, not transient
         if (
           error instanceof Error &&
