@@ -8,6 +8,8 @@ import { notFoundHandler } from '@common/middleware/notFound';
 import { requestLogger } from '@common/middleware/requestLogger';
 import { logger } from '@common/utils/logger';
 
+import authRoutes from '@modules/auth/auth.routes';
+
 export function createApp(): express.Application {
   const app = express();
 
@@ -39,7 +41,7 @@ export function createApp(): express.Application {
   });
 
   // API routes — registered as each module milestone completes
-  // app.use('/api/v1/auth',            authRoutes);
+  app.use('/api/v1/auth', authRoutes);
   // app.use('/api/v1/users',           usersRoutes);
   // app.use('/api/v1/departments',     departmentsRoutes);
   // app.use('/api/v1/projects',        projectsRoutes);

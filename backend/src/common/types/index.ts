@@ -17,7 +17,7 @@ export type RoleName = (typeof ROLE_NAMES)[number];
 // ─── JWT payload shape ───────────────────────────────────────────────────────
 
 export interface JwtPayload {
-  sub: string;          // user UUID
+  sub: string; // user UUID
   email: string;
   role: RoleName;
   departmentId: string | null;
@@ -56,7 +56,7 @@ export interface ApiErrorResponse {
   error: {
     code: string;
     message: string;
-    details?: Record<string, unknown>;
+    details?: Record<string, unknown> | undefined;
   };
 }
 
