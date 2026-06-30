@@ -2,9 +2,12 @@
  * Zustand store root.
  *
  * Each feature slice is defined in its own file and re-exported here.
- * The auth slice is added in M2 (Authentication milestone).
- *
- * Pattern: use slices, not a single monolithic store.
- * Each slice: create<SliceState>()(devtools(persist(...), { name: 'ebfms-slice-name' }))
+ * Import from the specific slice file for best tree-shaking,
+ * or from here for convenience.
  */
-export {};
+export {
+  selectIsAuthenticated,
+  selectMustChangePassword,
+  selectUserRole,
+  useAuthStore,
+} from './authStore';

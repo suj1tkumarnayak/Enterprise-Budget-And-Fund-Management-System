@@ -3,10 +3,27 @@
  *
  * All monetary display in EBFMS goes through these helpers to ensure
  * consistent locale-aware formatting across the entire UI.
+ *
+ * NOTE: Values received from the API are strings (Prisma Decimal serialises to
+ * string). Never parse them to `number` for display math — pass directly to
+ * formatMoney() or formatCurrency().
  */
 
 const DEFAULT_LOCALE = 'en-US';
 const DEFAULT_CURRENCY = 'USD';
+
+/**
+ * Primary formatter used by all feature components.
+ * Alias of formatCurrency with defaults applied.
+ * e.g. "1234567.89" → "$1,234,567.89"
+ *
+ * This is the canonical formatter referenced in the Frontend Engineer role doc.
+ * Always use formatMoney() in feature components; use formatCurrency() only
+ * when you need explicit locale/currency control.
+ */
+export function formatMoney(value: number | string): string {
+  return formatCurrency(value, DEFAULT_CURRENCY, DEFAULT_LOCALE);
+}
 
 /**
  * Format a numeric or string monetary value for display.
