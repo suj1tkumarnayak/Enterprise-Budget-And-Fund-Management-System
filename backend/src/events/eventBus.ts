@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 
 import { logger } from '@common/utils/logger';
+import { Prisma } from '@prisma/client';
 
 /**
  * Internal in-process event bus (ADR-007).
@@ -12,7 +13,7 @@ import { logger } from '@common/utils/logger';
  */
 
 export interface AuditEventPayload {
-  actorId: string | null;
+  actorId: string;
   action:
     | 'Create'
     | 'Update'
@@ -30,8 +31,8 @@ export interface AuditEventPayload {
     | 'RoleChange';
   entityType: string;
   entityId: string;
-  beforeState?: Record<string, unknown> | null;
-  afterState?: Record<string, unknown> | null;
+  beforeState?: Record<string, unknown> | Prisma.NullableJsonNullValueInput;
+  afterState?: Record<string, unknown> | Prisma.NullableJsonNullValueInput;
   ipAddress?: string | null;
   userAgent?: string | null;
 }

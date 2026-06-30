@@ -1,19 +1,22 @@
 import { createBrowserRouter, isRouteErrorResponse, useRouteError } from 'react-router-dom';
 
-import { AppShell } from '@components/layout';
+import { ProtectedRoute } from '../components/common/ProtectedRoute';
+import { AppShell } from '../components/layout';
+import {
+  ChangePasswordPage,
+  ForgotPasswordPage,
+  LoginPage,
+  ResetPasswordPage,
+} from '../features/auth';
 
 /**
- * Application route tree.
+ * Application route tree — M2 complete.
  *
- * Routes are registered here as each feature module is implemented.
- * Lazy imports are used for all feature routes to enable code splitting —
- * users only download the JavaScript for routes they actually visit.
+ * Auth routes are public (no AppShell, no ProtectedRoute).
+ * All other routes are wrapped in ProtectedRoute + AppShell.
  *
- * Auth guard (ProtectedRoute) is added in M2 (Authentication milestone).
- * The AppShell is already wired so the layout renders correctly on M2.
- *
- * Route guard RBAC matrix (from architecture doc Section 3.8) is enforced
- * per-route in M2 using the useAuthStore role selector.
+ * RBAC per-route allowedRoles is added here as each module is implemented,
+ * following the RBAC matrix in architecture doc §3.8.
  */
 
 function NotFoundPage(): JSX.Element {
@@ -48,7 +51,13 @@ function RootErrorBoundary(): JSX.Element {
       <div className="text-center">
         <p className="text-lg font-semibold text-red-600">Application error</p>
         <p className="mt-2 text-sm text-gray-500">Something went wrong. Please refresh the page.</p>
-        <button type="button" onClick={() => window.location.reload()} className="btn-primary mt-6">
+        <button
+          type="button"
+          onClick={() => {
+            window.location.reload();
+          }}
+          className="btn-primary mt-6"
+        >
           Refresh
         </button>
       </div>
@@ -65,105 +74,148 @@ function ComingSoonPage({ title }: { title: string }): JSX.Element {
   );
 }
 
+/** Helper: wraps a page in ProtectedRoute + AppShell. */
+function Protected({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles?: import('../types').RoleName[];
+}): JSX.Element {
+  return (
+    <ProtectedRoute allowedRoles={allowedRoles}>
+      <AppShell>{children}</AppShell>
+    </ProtectedRoute>
+  );
+}
+
 export const router = createBrowserRouter([
+  // ── Public auth routes (no AppShell, no ProtectedRoute) ──────────────────
+  {
+    path: '/login',
+    element: <LoginPage />,
+    errorElement: <RootErrorBoundary />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+
+  // ── Change-password: authenticated but no role restriction ────────────────
+  {
+    path: '/change-password',
+    element: (
+      <ProtectedRoute>
+        <ChangePasswordPage />
+      </ProtectedRoute>
+    ),
+  },
+
+  // ── Protected application routes ──────────────────────────────────────────
   {
     path: '/',
     element: (
-      <AppShell>
+      <Protected>
         <ComingSoonPage title="Dashboard" />
-      </AppShell>
+      </Protected>
     ),
     errorElement: <RootErrorBoundary />,
-    children: [],
   },
 
-  // ── Feature routes — registered as each milestone completes ──────────────
-  // M2: /login, /forgot-password, /reset-password (public, no AppShell)
-  // M3: /users, /users/:id
-  // M4: /departments, /departments/:id
-  // M5: /projects, /projects/:id, /teams
-  // M6: /budget-requests, /budget-requests/:id, /budget-requests/new
-  // M7: /approvals, /approvals/:id
-  // M8: /allocations, /allocations/:id
-  // M9: /expenses, /expenses/:id, /expenses/new
-  // M10: /notifications
-  // M11: /audit
-  // M12: /payroll
-  // M13: /reports
-  // M14: /analytics
-  // M16: /settings
-  // M18: /profile
+  // M3: Users — Admin only
+  // { path: '/users', element: <Protected allowedRoles={['Admin']}><UsersPage /></Protected> },
 
-  {
-    path: '/budget-requests',
-    element: (
-      <AppShell>
-        <ComingSoonPage title="Budget Requests" />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/approvals',
-    element: (
-      <AppShell>
-        <ComingSoonPage title="Approvals" />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/allocations',
-    element: (
-      <AppShell>
-        <ComingSoonPage title="Fund Allocations" />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/expenses',
-    element: (
-      <AppShell>
-        <ComingSoonPage title="Expenses" />
-      </AppShell>
-    ),
-  },
+  // M4: Departments
   {
     path: '/departments',
     element: (
-      <AppShell>
+      <Protected>
         <ComingSoonPage title="Departments" />
-      </AppShell>
+      </Protected>
     ),
   },
+
+  // M5: Projects
   {
     path: '/projects',
     element: (
-      <AppShell>
+      <Protected>
         <ComingSoonPage title="Projects" />
-      </AppShell>
+      </Protected>
     ),
   },
+
+  // M6: Budget Requests
+  {
+    path: '/budget-requests',
+    element: (
+      <Protected>
+        <ComingSoonPage title="Budget Requests" />
+      </Protected>
+    ),
+  },
+
+  // M7: Approvals
+  {
+    path: '/approvals',
+    element: (
+      <Protected>
+        <ComingSoonPage title="Approvals" />
+      </Protected>
+    ),
+  },
+
+  // M8: Allocations
+  {
+    path: '/allocations',
+    element: (
+      <Protected>
+        <ComingSoonPage title="Fund Allocations" />
+      </Protected>
+    ),
+  },
+
+  // M9: Expenses
+  {
+    path: '/expenses',
+    element: (
+      <Protected>
+        <ComingSoonPage title="Expenses" />
+      </Protected>
+    ),
+  },
+
+  // M13: Reports
   {
     path: '/reports',
     element: (
-      <AppShell>
+      <Protected>
         <ComingSoonPage title="Reports" />
-      </AppShell>
+      </Protected>
     ),
   },
+
+  // M14: Analytics
   {
     path: '/analytics',
     element: (
-      <AppShell>
+      <Protected>
         <ComingSoonPage title="Analytics" />
-      </AppShell>
+      </Protected>
     ),
   },
+
+  // M16: Settings — Admin only
   {
     path: '/settings',
     element: (
-      <AppShell>
+      <Protected allowedRoles={['Admin']}>
         <ComingSoonPage title="Settings" />
-      </AppShell>
+      </Protected>
     ),
   },
 
@@ -171,9 +223,9 @@ export const router = createBrowserRouter([
   {
     path: '*',
     element: (
-      <AppShell>
+      <Protected>
         <NotFoundPage />
-      </AppShell>
+      </Protected>
     ),
   },
 ]);

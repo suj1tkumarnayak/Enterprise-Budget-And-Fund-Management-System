@@ -1,45 +1,57 @@
-# pending.md — Task Queue Template
+# pending.md — QA Engineer Task Queue
 
-> Copy this file to each role folder and remove this header.
-> Owner: the role listed in the folder name.
-> Updated: at the START and END of every work session.
+> Owner: QA Engineer
+> Updated: 2026-06-30 — TASK-016 (auth integration tests) completed.
 
 ---
 
 ## IN PROGRESS
 
 | Task ID | Description | Priority | Started | Branch |
-|---------|-------------|----------|---------|--------|
-| TASK-XXX | Example in-progress task | P1 | YYYY-MM-DD HH:mm UTC | role/TASK-XXX/description |
+| ------- | ----------- | -------- | ------- | ------ |
+| —       | —           | —        | —       | —      |
 
 ---
 
-## PENDING (not yet started)
+## PENDING
 
-| Task ID | Description | Priority | Assigned By | Notes |
-|---------|-------------|----------|-------------|-------|
-| TASK-YYY | Example pending task | P2 | Project Manager | Waiting on TASK-XXX to complete |
+| Task ID  | Description                                                                                                                                                                    | Priority | Assigned By       | Notes                                                                                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| —        | Re-run `npm run test:coverage` once this suite is merged to confirm the auth module clears 80% now that `jest.config.ts`'s coverage gate is genuinely enforced (AUDIT-002-BE). | P1       | Self              | No live test DB in this sandbox session — could not execute the run; flagged as the immediate next QA action. |
+| TASK-017 | Security review sign-off on the auth module                                                                                                                                    | P1       | Security Engineer | Still outside QA ownership — not blocking this task, but M2 cannot be ✅ until it lands.                      |
 
 ---
 
 ## BLOCKED
 
 | Task ID | Description | Blocked By | Escalated To | Date Blocked |
-|---------|-------------|------------|--------------|--------------|
-| TASK-ZZZ | Example blocked task | Missing API endpoint | Backend Engineer | YYYY-MM-DD |
+| ------- | ----------- | ---------- | ------------ | ------------ |
+| —       | —           | —          | —            | —            |
 
 ---
 
 ## DONE (this sprint)
 
-| Task ID | Description | Completed | PR / Commit |
-|---------|-------------|-----------|-------------|
-| TASK-AAA | Example completed task | YYYY-MM-DD | PR #42 |
+| Task ID  | Description                                                                                                                          | Completed  | PR / Commit                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------- |
+| TASK-016 | Auth integration tests (`backend/tests/integration/auth.test.ts`) — all 5 endpoints, 400/401/403 cases, public-route exemption check | 2026-06-30 | `/mnt/user-data/outputs/backend/tests/integration/auth.test.ts` |
 
 ---
 
+## Bug filed this session
+
+A 422 (business-rule violation) is expected for an invalid/expired/used
+password-reset token per `CODING_STANDARD.md` §4's general 422 convention,
+but `auth.service.ts`'s `resetPassword()` throws `ValidationError`, which
+`errorHandler.ts` maps to **400**, not 422. The test suite asserts the
+actual (400) behavior so it doesn't false-fail, but this is logged as a
+discrepancy for Backend Engineer to confirm is intentional (an
+invalid-token submission is arguably closer to a validation failure than
+a business-rule violation, so 400 may in fact be correct — needs a
+System Architect/Backend Engineer call, not a QA unilateral fix).
+
 ## Priority Legend
 
-- **P1** — Blocks another role or the current sprint milestone. Do this first.
+- **P1** — Blocks another role or the current sprint milestone.
 - **P2** — Important, should be done this sprint.
-- **P3** — Backlog; do after P1 and P2 are clear.
+- **P3** — Backlog.

@@ -22,7 +22,7 @@
     "paths": {
       "@common/*": ["common/*"],
       "@modules/*": ["modules/*"],
-      "@prisma/*": ["prisma/*"],
+      "@db/*": ["prisma/*"],
       "@config/*": ["config/*"],
       "@events/*": ["events/*"],
       "@jobs/*": ["jobs/*"]

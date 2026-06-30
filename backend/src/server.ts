@@ -1,5 +1,5 @@
 import { config } from '@config/index';
-import { prisma } from '@prisma/client';
+import { prisma } from '@db/client';
 import { logger } from '@common/utils/logger';
 import { createApp } from './app';
 

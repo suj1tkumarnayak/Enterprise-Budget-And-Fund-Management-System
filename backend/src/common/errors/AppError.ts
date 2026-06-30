@@ -7,7 +7,7 @@
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly errorCode: string;
-  public readonly details?: Record<string, unknown>;
+  public readonly details?: Record<string, unknown> | undefined;
   public readonly isOperational: boolean;
 
   constructor(
@@ -62,9 +62,7 @@ export class ForbiddenError extends AppError {
 export class NotFoundError extends AppError {
   constructor(resource: string, id?: string) {
     const message =
-      id !== undefined
-        ? `${resource} with id '${id}' not found`
-        : `${resource} not found`;
+      id !== undefined ? `${resource} with id '${id}' not found` : `${resource} not found`;
     super(404, 'NOT_FOUND', message, { resource, id });
     this.name = 'NotFoundError';
   }

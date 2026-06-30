@@ -72,3 +72,7 @@ export interface PaginationParams {
 export interface SoftDeletable {
   deletedAt: Date | null;
 }
+
+export function isValidRoleName(value: string): value is RoleName {
+  return ROLE_NAMES.includes(value as RoleName);
+}

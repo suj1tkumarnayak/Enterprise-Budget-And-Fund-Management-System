@@ -31,12 +31,9 @@ if (process.env['NODE_ENV'] !== 'production') {
   globalForPrisma.prisma = prisma;
 
   // Log slow queries in development to surface N+1 and missing-index problems early.
-  (prisma as PrismaClient).$on(
-    'query' as never,
-    (e: { query: string; duration: number }) => {
-      if (e.duration > 200) {
-        logger.warn('Slow query detected', { query: e.query, durationMs: e.duration });
-      }
-    },
-  );
+  (prisma as PrismaClient).$on('query' as never, (e: { query: string; duration: number }) => {
+    if (e.duration > 200) {
+      logger.warn('Slow query detected', { query: e.query, durationMs: e.duration });
+    }
+  });
 }

@@ -1,14 +1,16 @@
 import crypto from 'crypto';
 
 import argon2 from 'argon2';
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
+
+import type { StringValue } from 'ms';
 
 import { config } from '@config/index';
 import { ForbiddenError, UnauthenticatedError, ValidationError } from '@common/errors';
 import type { RoleName } from '@common/types';
 import { isValidRoleName } from '@common/types';
 import { eventBus } from '@events/eventBus';
-import { prisma } from '@prisma/client';
+import { prisma } from '@db/client';
 import { logger } from '@common/utils/logger';
 
 import type { AuthUserDto, LoginResponseDto, RefreshResponseDto } from './auth.dto';
@@ -52,7 +54,7 @@ function toAuthUserDto(user: {
     id: user.id,
     email: user.email,
     fullName: user.fullName,
-    role: user.role.name,
+    role: user.role.name as RoleName,
     departmentId: user.departmentId,
   };
 }
@@ -66,7 +68,7 @@ function signAccessToken(user: AuthUserDto): string {
       departmentId: user.departmentId,
     },
     config.jwt.accessSecret,
-    { expiresIn: config.jwt.accessExpiry },
+    { expiresIn: config.jwt.accessExpiry as StringValue },
   );
 }
 
@@ -90,8 +92,8 @@ async function issueRefreshToken(userId: string, ctx: RequestContext): Promise<s
       userId,
       tokenHash: hashToken(token),
       expiresAt,
-      userAgent: ctx.userAgent ?? undefined,
-      ipAddress: ctx.ipAddress ?? undefined,
+      userAgent: ctx.userAgent ?? null,
+      ipAddress: ctx.ipAddress ?? null,
     },
   });
 
@@ -137,8 +139,8 @@ async function login(dto: LoginInput, ctx: RequestContext): Promise<LoginRespons
         action: 'SystemAlert' as never, // see note below
         entityType: 'User',
         entityId: user.id,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
+        ipAddress: ctx.ipAddress ?? null,
+        userAgent: ctx.userAgent ?? null,
       });
     }
 
@@ -159,8 +161,8 @@ async function login(dto: LoginInput, ctx: RequestContext): Promise<LoginRespons
     action: 'Login',
     entityType: 'User',
     entityId: user.id,
-    ipAddress: ctx.ipAddress,
-    userAgent: ctx.userAgent,
+    ipAddress: ctx.ipAddress ?? null,
+    userAgent: ctx.userAgent ?? null,
   });
 
   return {
@@ -196,8 +198,8 @@ async function refresh(refreshToken: string, ctx: RequestContext): Promise<Refre
       action: 'SystemAlert' as never,
       entityType: 'User',
       entityId: existing.userId,
-      ipAddress: ctx.ipAddress,
-      userAgent: ctx.userAgent,
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
     });
 
     throw new UnauthenticatedError('Refresh token has already been used');
