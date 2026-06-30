@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
 import argon2 from 'argon2';
-import jwt, { type SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 
 import type { StringValue } from 'ms';
 
@@ -134,11 +134,25 @@ async function login(dto: LoginInput, ctx: RequestContext): Promise<LoginRespons
     });
 
     if (shouldLock) {
+      // SEC-001 fix: 'SystemAlert' is not a member of the Prisma `AuditAction`
+      // enum (Create|Update|Delete|Approve|Reject|Return|Withdraw|Allocate|
+      // Post|Import|Login|Logout|PasswordChange|RoleChange). The previous
+      // `action: 'SystemAlert' as never` cast silenced the type-checker but
+      // caused every write to fail inside audit.service.ts's try/catch,
+      // so lockout events were never actually persisted to audit_logs.
+      // Fixed per Security Engineer's TASK-017 review (§8) recommendation:
+      // use the existing 'Update' action with a descriptive afterState
+      // instead of introducing a schema change for a new enum value.
       eventBus.emitTyped('audit', {
         actorId: user.id,
-        action: 'SystemAlert' as never, // see note below
+        action: 'Update',
         entityType: 'User',
         entityId: user.id,
+        afterState: {
+          event: 'AccountLocked',
+          reason: 'Maximum failed login attempts exceeded',
+          failedLoginAttempts: failedAttempts,
+        },
         ipAddress: ctx.ipAddress ?? null,
         userAgent: ctx.userAgent ?? null,
       });
@@ -193,11 +207,18 @@ async function refresh(refreshToken: string, ctx: RequestContext): Promise<Refre
       userId: existing.userId,
     });
 
+    // SEC-001 fix: see note above — 'SystemAlert' is not a valid
+    // AuditAction. Use 'Update' + afterState describing the security event
+    // so refresh-token-reuse (theft signal) actually lands in audit_logs.
     eventBus.emitTyped('audit', {
       actorId: existing.userId,
-      action: 'SystemAlert' as never,
+      action: 'Update',
       entityType: 'User',
       entityId: existing.userId,
+      afterState: {
+        event: 'RefreshTokenReuseDetected',
+        reason: 'Revoked refresh token was reused — all sessions revoked',
+      },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,
     });
